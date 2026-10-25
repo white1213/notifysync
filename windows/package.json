@@ -1,0 +1,50 @@
+{
+  "name": "notifysync-windows",
+  "version": "1.0.0",
+  "description": "NotifySync - 局域网手机通知同步（Windows 接收端）",
+  "main": "main.js",
+  "author": "NotifySync",
+  "homepage": "https://localhost",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/loopback.js",
+    "gen:icon": "node tools/gen-icon.js",
+    "gen:ico": "node tools/gen-ico.js",
+    "gen:vectors": "node tools/gen-vectors.js",
+    "dist": "electron-builder --win nsis"
+  },
+  "license": "MIT",
+  "build": {
+    "appId": "com.notifysync.app",
+    "productName": "NotifySync",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "renderer/**/*",
+      "assets/icon-*.png"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "NotifySync"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

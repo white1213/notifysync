@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>通知同步</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="dot"></span>通知同步</div>
+    <div id="deviceChips" class="chips"></div>
+    <div class="spacer"></div>
+    <button id="btnDevices" class="ghost">设备</button>
+    <button id="btnSettings" class="ghost">设置</button>
+  </header>
+
+  <div class="main">
+    <aside id="appFilter"></aside>
+    <section class="content">
+      <div class="toolbar">
+        <input id="search" type="text" placeholder="搜索通知内容…">
+        <span id="countInfo" class="count"></span>
+      </div>
+      <div id="list" class="list"></div>
+    </section>
+  </div>
+
+  <!-- 设备 -->
+  <div id="modalDevices" class="modal hidden">
+    <div class="dialog">
+      <div class="dialog-head"><h3>设备管理</h3><button class="close" data-close="modalDevices">×</button></div>
+      <h4>已配对</h4>
+      <div id="pairedList" class="devlist"></div>
+      <div id="netStatus" class="hint" style="margin-bottom:8px"></div>
+      <button id="btnFirewall" class="ghost" style="width:100%;margin-bottom:10px">
+        修复防火墙（看不到设备时点我，弹出的授权窗口选"是"）
+      </button>
+      <h4>发现的新设备 <span class="hint">（同一 WiFi 下运行 NotifySync 的设备）</span></h4>
+      <div id="discoveredList" class="devlist"></div>
+      <p class="hint">配对时请核对两台设备屏幕上的验证码一致。</p>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div id="modalSettings" class="modal hidden">
+    <div class="dialog">
+      <div class="dialog-head"><h3>设置</h3><button class="close" data-close="modalSettings">×</button></div>
+      <label class="row">本机名称 <input id="setDeviceName" type="text"></label>
+      <label class="row check"><input id="setMirrorToast" type="checkbox"> 收到通知时弹 Windows 通知</label>
+      <label class="row check"><input id="setOtpAutoCopy" type="checkbox"> 验证码自动复制到剪贴板</label>
+      <label class="row check"><input id="setOfflineToast" type="checkbox"> 设备上线/离线时提醒</label>
+      <label class="row check"><input id="setAutoStart" type="checkbox"> 开机自启动</label>
+      <label class="row">历史保留 <input id="setRetention" type="number" min="1" max="365" style="width:70px"> 天</label>
+      <div class="danger-zone">
+        <button id="btnClear" class="danger">清空全部历史</button>
+      </div>
+      <p class="hint">关闭窗口会最小化到托盘，退出请用托盘图标右键菜单。</p>
+    </div>
+  </div>
+
+  <!-- 收到配对请求 -->
+  <div id="modalPair" class="modal hidden">
+    <div class="dialog small">
+      <h3 id="pairTitle">配对请求</h3>
+      <p id="pairDesc"></p>
+      <div class="code" id="pairCode">----</div>
+      <p class="hint">请核对此验证码与对方设备屏幕上显示的一致，再点击确认。</p>
+      <div class="btns">
+        <button id="btnPairReject" class="ghost">拒绝</button>
+        <button id="btnPairConfirm" class="primary">确认配对</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

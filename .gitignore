@@ -1,0 +1,28 @@
+# 构建产物 / 大文件不入库（发布物放 GitHub Releases）
+dist/
+*.apk
+*.exe
+*.blockmap
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.jks
+*.keystore
+.cxx/
+captures/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 运行时数据
+engine.log
+*.log

@@ -1,0 +1,75 @@
+{
+  "note": "NotifySync 跨端一致性测试向量。Android 端 CryptoTest.kt 与 Windows 端 test/loopback.js 必须全部通过。",
+  "keyA": {
+    "privPem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgZfv+oAF34+DqAngJ\nBwQN1Lye4M+fmyE7mNY0XVB/ybmhRANCAATvPkfpRNg4stjWsOxtQJFA01udhdF5\ndL3QU3VMW7bX+5a7YnUDjYAq4lMdrzUG/NiR01ewkGG99gHvEDqUM9Sj\n-----END PRIVATE KEY-----",
+    "pubPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7z5H6UTYOLLY1rDsbUCRQNNbnYXR\neXS90FN1TFu21/uWu2J1A42AKuJTHa81BvzYkdNXsJBhvfYB7xA6lDPUow==\n-----END PUBLIC KEY-----",
+    "privB64": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgZfv+oAF34+DqAngJBwQN1Lye4M+fmyE7mNY0XVB/ybmhRANCAATvPkfpRNg4stjWsOxtQJFA01udhdF5dL3QU3VMW7bX+5a7YnUDjYAq4lMdrzUG/NiR01ewkGG99gHvEDqUM9Sj",
+    "pubB64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7z5H6UTYOLLY1rDsbUCRQNNbnYXReXS90FN1TFu21/uWu2J1A42AKuJTHa81BvzYkdNXsJBhvfYB7xA6lDPUow=="
+  },
+  "keyB": {
+    "privPem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgQGmIKS1SV0VgBlqY\nQHNmWTtGW5uErXFz/aYv52cI5j+hRANCAAQbO5q3x9LZ/iHNRHfRrhk6L75kf+V3\n6YlOqhzADkXIUSWTZ8cx4e1iRFWauIVJq/AJpeT4cvh4oBu9XhKDeX6r\n-----END PRIVATE KEY-----",
+    "pubPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGzuat8fS2f4hzUR30a4ZOi++ZH/l\nd+mJTqocwA5FyFElk2fHMeHtYkRVmriFSavwCaXk+HL4eKAbvV4Sg3l+qw==\n-----END PUBLIC KEY-----",
+    "privB64": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgQGmIKS1SV0VgBlqYQHNmWTtGW5uErXFz/aYv52cI5j+hRANCAAQbO5q3x9LZ/iHNRHfRrhk6L75kf+V36YlOqhzADkXIUSWTZ8cx4e1iRFWauIVJq/AJpeT4cvh4oBu9XhKDeX6r",
+    "pubB64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGzuat8fS2f4hzUR30a4ZOi++ZH/ld+mJTqocwA5FyFElk2fHMeHtYkRVmriFSavwCaXk+HL4eKAbvV4Sg3l+qw=="
+  },
+  "nonceA": "AAECAwQFBgcICQoLDA0ODw==",
+  "nonceB": "8ODQwLCgkIBwYFBAMCAQAA==",
+  "sharedX": "3bd5a647d958f58fa8299d6e0e1cea04345e953b37f78e8e1adb4376324c8b86",
+  "verCode": "6D85",
+  "sessionKey": "e7703888d3058dd8d0b7312cea07bb2891c9317f839222731fd2d7be5683588e",
+  "framePlain": "{\"type\":\"ping\",\"ts\":1730000000000}",
+  "frameNonce": "000102030405060708090a0b",
+  "frameCiphertext": "aec46a06991993db01141ba54bf17b3d8571ad87d078e56ede75601cf99d35607c5ee6e34d9541deec3f9527d149ba993064",
+  "otpCases": [
+    {
+      "title": "微信支付",
+      "text": "您的验证码是883211，请勿泄露给他人。",
+      "expect": "883211"
+    },
+    {
+      "title": "95588",
+      "text": "您在工商银行的动态码为 730 122，5分钟内有效",
+      "expect": "730122"
+    },
+    {
+      "title": "",
+      "text": "【某商城】订单20241025已支付，校验码666888",
+      "expect": "666888"
+    },
+    {
+      "title": "",
+      "text": "123456",
+      "expect": "123456"
+    },
+    {
+      "title": "Gmail",
+      "text": "Your verification code is 458912",
+      "expect": "458912"
+    },
+    {
+      "title": "GitHub",
+      "text": "Your one-time password is 729 441. It expires in 10 minutes.",
+      "expect": "729441"
+    },
+    {
+      "title": "天气",
+      "text": "今天气温 23 度，适合出行",
+      "expect": null
+    },
+    {
+      "title": "外卖",
+      "text": "订单 2025001 已送达，评分领红包 888",
+      "expect": null
+    },
+    {
+      "title": "",
+      "text": "您的包裹已放入丰巢柜，取件码 A3F2",
+      "expect": null
+    },
+    {
+      "title": "银行",
+      "text": "尾号8831的卡消费100.00元",
+      "expect": null
+    }
+  ]
+}

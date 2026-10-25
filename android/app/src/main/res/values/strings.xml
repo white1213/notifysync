@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">通知同步</string>
+    <string name="channel_mirror">镜像通知</string>
+    <string name="channel_mirror_desc">从其他设备同步过来的通知</string>
+    <string name="channel_status">同步状态</string>
+    <string name="channel_status_desc">前台服务常驻状态，显示设备连接情况</string>
+    <string name="copy_code">复制验证码</string>
+    <string name="open_app">打开通知同步</string>
+</resources>
