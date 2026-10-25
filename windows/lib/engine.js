@@ -577,6 +577,22 @@ class SyncEngine extends EventEmitter {
         return;
       }
       case 'ack': return this.emit('ack', { ...this._peerInfo(conn), nid: obj.nid });
+      case 'clip': {
+        this._log(`clip in from ${String(conn.peerId).slice(0, 8)} hash=${obj.hash} len=${(obj.text || '').length}`);
+        this.emit('clip', obj);
+        // 中转：与 notif 相同的防环去重（§6.2）
+        const ckey = `clip|${obj.hash}`;
+        if (!this._relayedSeen) this._relayedSeen = new Set();
+        if (this._relayedSeen.has(ckey)) return;
+        this._relayedSeen.add(ckey);
+        if (this._relayedSeen.size > 5000) {
+          this._relayedSeen = new Set([...this._relayedSeen].slice(-2500));
+        }
+        for (const c of this.byPeer.values()) {
+          if (c !== conn && c.state === 'encrypted') c.sendJsonEnc(obj);
+        }
+        return;
+      }
       case 'peers': return this._onPeersIntroduced(obj);
       case 'ping': return conn.sendJsonEnc({ type: 'pong', ts: Date.now() });
       case 'pong': return;
@@ -637,6 +653,25 @@ class SyncEngine extends EventEmitter {
     for (const c of this.byPeer.values()) {
       if (c.state === 'encrypted') c.sendJsonEnc(msg);
     }
+  }
+
+  /** 剪贴板同步：广播本机剪贴板文本（调用方负责变化检测与去重） */
+  sendClip(text) {
+    const msg = {
+      type: 'clip',
+      cid: this.store.newNid(),
+      hash: require('crypto').createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 32),
+      text: String(text).slice(0, 100000),
+      originId: this.identity.id,
+      originName: this.identity.name,
+      ts: Date.now(),
+    };
+    if (!this._relayedSeen) this._relayedSeen = new Set();
+    this._relayedSeen.add(`clip|${msg.hash}`);
+    for (const c of this.byPeer.values()) {
+      if (c.state === 'encrypted') c.sendJsonEnc(msg);
+    }
+    return msg;
   }
 
   // ---- 连接关闭 ----

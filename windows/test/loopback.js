@@ -320,6 +320,37 @@ async function testNotifRelay() {
   console.log('  notif relay via hub (regression): OK');
 }
 
+async function testClipboardSync() {
+  // B—A—C：B 复制的文本应到达 A 并经 A 中转到达 C；不会回环
+  const storeA = tmpStore('cb-a', 'pc');
+  const storeB = tmpStore('cb-b', 'phone');
+  const storeC = tmpStore('cb-c', 'phone');
+  const a = engineFor(storeA, 41123);
+  const b = engineFor(storeB, 41124);
+  const c = engineFor(storeC, 41125);
+  a.start({ discovery: false });
+  b.start({ discovery: false });
+  c.start({ discovery: false });
+  await pairAndConnect(a, b, 41124);
+  await pairAndConnect(a, c, 41125);
+
+  const gotA = once(a, 'clip', 10000);
+  const gotC = once(c, 'clip', 10000);
+  b.sendClip('剪贴板测试 clipboard-ok 123');
+  const na = await gotA;
+  const nc = await gotC;
+  assert.strictEqual(na.text, '剪贴板测试 clipboard-ok 123');
+  assert.strictEqual(nc.text, '剪贴板测试 clipboard-ok 123');
+  assert.ok(na.hash && na.hash.length === 32, 'hash 应为 32 字符 hex');
+
+  // B 不应收到自己的回声；连接保持健在
+  await wait(2000);
+  assert.strictEqual(a.status().peers.filter((p) => p.online).length, 2);
+
+  a.stop(); b.stop(); c.stop();
+  console.log('  clipboard sync + relay (regression): OK');
+}
+
 async function main() {
   console.log('crypto vectors:');
   await testCryptoVectors();
@@ -333,6 +364,7 @@ async function main() {
   await testPairSurvivesDupConn();
   await testPeerIntroduction();
   await testNotifRelay();
+  await testClipboardSync();
   console.log('\nALL TESTS PASSED');
 }
 

@@ -38,6 +38,21 @@ class Prefs(private val ctx: Context) {
         get() = sp.getBoolean("bootStart", true)
         set(v) = sp.edit().putBoolean("bootStart", v).apply()
 
+    /** 剪贴板同步 */
+    var clipSync: Boolean
+        get() = sp.getBoolean("clipSync", true)
+        set(v) = sp.edit().putBoolean("clipSync", v).apply()
+
+    /** 剪贴板同步时弹提示 */
+    var clipToast: Boolean
+        get() = sp.getBoolean("clipToast", true)
+        set(v) = sp.edit().putBoolean("clipToast", v).apply()
+
+    /** 最后同步的剪贴板哈希（防回环 + 防重启后重复广播） */
+    var lastClipHash: String
+        get() = sp.getString("lastClipHash", "") ?: ""
+        set(v) = sp.edit().putString("lastClipHash", v).apply()
+
     private fun identityFile(): File = File(ctx.filesDir, "identity.json")
 
     private fun loadOrCreateIdentity(): Identity {

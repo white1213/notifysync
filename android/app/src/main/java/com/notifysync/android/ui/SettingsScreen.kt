@@ -93,6 +93,16 @@ fun SettingsScreen() {
             desc = "重启手机后自动恢复同步",
             initial = UiState.settingsBootStart,
         ) { app.prefs.bootStart = it; UiState.settingsBootStart = it }
+        SettingSwitch(
+            title = "剪贴板同步",
+            desc = "接收：其他设备复制的内容自动进入本机剪贴板；发送：打开本 App 或用系统分享菜单（Android 10+ 禁止后台读剪贴板）",
+            initial = UiState.settingsClipSync,
+        ) { app.prefs.clipSync = it; UiState.settingsClipSync = it }
+        SettingSwitch(
+            title = "剪贴板同步提示",
+            desc = "收到远端剪贴板时弹 Toast",
+            initial = UiState.settingsClipToast,
+        ) { app.prefs.clipToast = it; UiState.settingsClipToast = it }
 
         Text("本机名称", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {

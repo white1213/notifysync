@@ -25,4 +25,6 @@ object UiState {
     var settingsIgnoreOngoing by mutableStateOf(true)
     var settingsRetentionDays by mutableStateOf(30)
     var settingsBootStart by mutableStateOf(true)
+    var settingsClipSync by mutableStateOf(true)
+    var settingsClipToast by mutableStateOf(true)
 }

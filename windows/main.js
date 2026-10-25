@@ -51,7 +51,22 @@ function bootstrap() {
   setInterval(() => store.prune(), 3600 * 1000);
   // 兜底：界面状态每 10 秒刷新一次，避免任何遗漏的事件导致界面停在旧状态
   setInterval(() => pushState(), 10000);
+
+  // 剪贴板轮询：电脑→手机全自动实时（手机→电脑受 Android 限制，走 App 前台/分享菜单）
+  clipLast = '';
+  try { clipLast = clipboard.readText(); } catch (_) {} // 启动时的既有内容不广播
+  setInterval(() => {
+    if (!store.settings.clipboardSync) return;
+    try {
+      const t = clipboard.readText();
+      if (!t || t === clipLast || t.length > 100000) return;
+      clipLast = t;
+      engine.sendClip(t);
+    } catch (_) {}
+  }, 1000);
 }
+
+let clipLast = '';
 
 function createWindow() {
   const startHidden = process.argv.includes('--hidden');
@@ -201,6 +216,23 @@ function wireEngine() {
   engine.on('paired', () => { tray && tray.rebuild && tray.rebuild(); pushState(); });
   engine.on('peer-unpaired', () => { tray && tray.rebuild && tray.rebuild(); pushState(); });
   engine.on('peer-status-changed', () => { tray && tray.rebuild && tray.rebuild(); pushState(); });
+  engine.on('clip', (c) => {
+    if (!store.settings.clipboardSync) return;
+    try { clipboard.writeText(c.text); } catch (_) { return; }
+    clipLast = c.text; // 防回环：自己写入的不算变化
+    if (store.settings.clipboardToast) {
+      try {
+        const t = new Notification({
+          title: '剪贴板已同步',
+          body: `来自 ${c.originName || '设备'}：${String(c.text).slice(0, 60)}`,
+          silent: true,
+        });
+        t.on('click', () => showWindow());
+        t.show();
+      } catch (_) {}
+    }
+  });
+
   engine.on('pair-waiting', (info) => { if (win) win.webContents.send('pair-waiting', info); });
   engine.on('pair-request', (info) => {
     showWindow();

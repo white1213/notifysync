@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS = {
   otpAutoCopy: true,     // 验证码自动复制到剪贴板
   retentionDays: DEFAULT_RETENTION_DAYS,
   offlineToast: true,    // 已配对设备掉线时弹提醒
+  clipboardSync: true,   // 实时同步剪贴板
+  clipboardToast: true,  // 剪贴板同步时弹提示
 };
 
 function os_hostname() {

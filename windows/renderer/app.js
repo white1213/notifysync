@@ -161,6 +161,8 @@ function renderSettingsModal() {
   document.getElementById('setMirrorToast').checked = !!s.mirrorToast;
   document.getElementById('setOtpAutoCopy').checked = !!s.otpAutoCopy;
   document.getElementById('setOfflineToast').checked = !!s.offlineToast;
+  document.getElementById('setClipSync').checked = !!s.clipboardSync;
+  document.getElementById('setClipToast').checked = !!s.clipboardToast;
   document.getElementById('setAutoStart').checked = !!s.autoStart;
   document.getElementById('setRetention').value = s.retentionDays || 30;
 }
@@ -192,6 +194,7 @@ document.getElementById('setDeviceName').addEventListener('change', (e) => {
 for (const [id, key] of [
   ['setMirrorToast', 'mirrorToast'], ['setOtpAutoCopy', 'otpAutoCopy'],
   ['setOfflineToast', 'offlineToast'], ['setAutoStart', 'autoStart'],
+  ['setClipSync', 'clipboardSync'], ['setClipToast', 'clipboardToast'],
 ]) {
   document.getElementById(id).addEventListener('change', (e) => NS.setSetting(key, e.target.checked));
 }

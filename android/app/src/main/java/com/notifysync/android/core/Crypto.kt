@@ -81,6 +81,12 @@ object Crypto {
 
     fun randomBytes(n: Int): ByteArray = ByteArray(n).also { rng.nextBytes(it) }
 
+    /** 剪贴板同步用的内容哈希：sha256 前 16 字节 hex（与 Windows 端一致） */
+    fun clipHash(text: String): String {
+        val d = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+        return d.take(16).joinToString("") { String.format("%02x", it) }
+    }
+
     /** [12B nonce][AES-256-GCM 密文+tag]，无 AAD */
     fun encrypt(key: ByteArray, plain: ByteArray): ByteArray {
         val nonce = randomBytes(12)

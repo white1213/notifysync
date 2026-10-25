@@ -143,6 +143,22 @@ class SyncService : Service(), SyncEngine.Listener {
         }
     }
 
+    override fun onClipReceived(text: String, hash: String, originName: String) {
+        if (!app.prefs.clipSync || text.isEmpty()) return
+        try {
+            val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("notifysync", text))
+            app.prefs.lastClipHash = hash // 防回环：前台读取时发现是自己刚写入的不再广播
+            if (app.prefs.clipToast) {
+                android.widget.Toast.makeText(
+                    this, "剪贴板已同步（来自 $originName）：${text.take(30)}", android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+        } catch (e: Exception) {
+            com.notifysync.android.core.LogBus.log("clip", "写入剪贴板失败: ${e.message}")
+        }
+    }
+
     // ---------------- 状态维护 ----------------
 
     private fun refreshUi() {
@@ -153,6 +169,8 @@ class SyncService : Service(), SyncEngine.Listener {
         UiState.settingsIgnoreOngoing = app.prefs.ignoreOngoing
         UiState.settingsRetentionDays = app.prefs.retentionDays
         UiState.settingsBootStart = app.prefs.bootStart
+        UiState.settingsClipSync = app.prefs.clipSync
+        UiState.settingsClipToast = app.prefs.clipToast
     }
 
     private fun refreshStatusNotification() {

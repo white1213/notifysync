@@ -35,6 +35,7 @@ class SyncEngine(
         fun onPairResult(ok: Boolean, kind: String)
         fun onNotifReceived(record: NotifRecord)
         fun onNotifAcked(nid: String)
+        fun onClipReceived(text: String, hash: String, originName: String)
     }
 
     class PairRequest(
@@ -833,6 +834,29 @@ class SyncEngine(
                 main.post { listener.onNotifAcked(obj.optString("nid")) }
             }
             "peers" -> onPeersIntroduced(obj)
+            "clip" -> {
+                val text = obj.optString("text")
+                val hash = obj.optString("hash")
+                LogBus.log("clip", "收到来自 ${obj.optString("originName")} 的剪贴板 (${text.length} 字)")
+                val source = conn
+                var relay = false
+                synchronized(lock) {
+                    if (clipSeen.add("clip|$hash")) {
+                        relay = true
+                        while (clipSeen.size > 500) clipSeen.remove(clipSeen.first())
+                    }
+                }
+                main.post { listener.onClipReceived(text, hash, obj.optString("originName")) }
+                if (relay) {
+                    synchronized(lock) {
+                        for (c in conns.values.toList()) {
+                            if (c.connId != source.connId && c.state == ConnState.ENCRYPTED) {
+                                c.sendJsonEnc(obj)
+                            }
+                        }
+                    }
+                }
+            }
             "ping" -> conn.sendJsonEnc(JSONObject().put("type", "pong").put("ts", System.currentTimeMillis()))
             "pong" -> {}
             "pair_request" -> onPairRequest(conn)
@@ -847,6 +871,27 @@ class SyncEngine(
                 main.post { listener.onPeerStatusChanged() }
             }
             "bye" -> conn.close("bye")
+        }
+    }
+
+    private val clipSeen = LinkedHashSet<String>() // 剪贴板中转防环（上限 500 条）
+
+    /** 剪贴板同步：广播本机剪贴板文本（调用方负责变化检测与去重） */
+    fun sendClip(text: String) {
+        val t = text.take(100000)
+        if (t.isEmpty()) return
+        val hash = Crypto.clipHash(t)
+        synchronized(lock) {
+            clipSeen.add("clip|$hash")
+            while (clipSeen.size > 500) clipSeen.remove(clipSeen.first())
+        }
+        val msg = JSONObject()
+            .put("type", "clip").put("cid", newUuid()).put("hash", hash).put("text", t)
+            .put("originId", prefs.identity.id)
+            .put("originName", prefs.identity.name)
+            .put("ts", System.currentTimeMillis())
+        for (c in conns.values.toList()) {
+            if (c.state == ConnState.ENCRYPTED) c.sendJsonEnc(msg)
         }
     }
 

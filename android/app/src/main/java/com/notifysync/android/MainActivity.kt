@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         handleCopyIntent(intent)
+        handleClipShareIntent(intent)
         UiState.settingsMaster = app.prefs.masterEnabled
         if (app.prefs.masterEnabled) SyncService.start(this)
 
@@ -67,15 +68,51 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleCopyIntent(intent)
-    }
-
     override fun onResume() {
         super.onResume()
         // 刷新历史列表（也可能来自其他线程的更新，这里兜底）
         app.dbExecutor.execute { UiState.items = app.db.queryRecent() }
+        // Android 10+ 后台禁读剪贴板：App 到前台时同步一次本机剪贴板
+        maybeSyncLocalClipboard()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleCopyIntent(intent)
+        handleClipShareIntent(intent)
+    }
+
+    /** 系统分享菜单入口：任意 App 里复制/选中文本 → 分享 → 通知同步 */
+    private fun handleClipShareIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        if (intent.type != "text/plain") return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        sendClipboardToPeers(text)
+    }
+
+    /** App 在前台时读取本机剪贴板并同步（有新内容且不是自己刚写入的） */
+    private fun maybeSyncLocalClipboard() {
+        if (!app.prefs.clipSync) return
+        try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val text = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: return
+            if (text.isBlank() || text.length > 100000) return
+            val hash = com.notifysync.android.core.Crypto.clipHash(text)
+            if (hash == app.prefs.lastClipHash) return
+            sendClipboardToPeers(text)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun sendClipboardToPeers(text: String) {
+        val engine = app.engine ?: run {
+            Toast.makeText(this, "同步服务未运行", Toast.LENGTH_SHORT).show()
+            return
+        }
+        engine.sendClip(text)
+        app.prefs.lastClipHash = com.notifysync.android.core.Crypto.clipHash(text)
+        val n = UiState.peers.count { it.online }
+        Toast.makeText(this, "剪贴板已同步到 $n 台在线设备", Toast.LENGTH_SHORT).show()
     }
 
     private fun requestNotificationPermission() {
