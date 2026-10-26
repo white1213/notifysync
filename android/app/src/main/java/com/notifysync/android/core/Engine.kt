@@ -36,6 +36,8 @@ class SyncEngine(
         fun onNotifReceived(record: NotifRecord)
         fun onNotifAcked(nid: String)
         fun onClipReceived(text: String, hash: String, originName: String)
+        /** 哨兵告警（§7.1）：通知监听失效且自救失败。同一轮故障只触发一次 */
+        fun onSentinelAlert(title: String, message: String)
     }
 
     class PairRequest(
@@ -358,6 +360,63 @@ class SyncEngine(
             sendPeers()
         }
     }
+
+    /**
+     * 哨兵自检（§7.1，由 SyncService 每 10 秒驱动）：通知监听是否仍然有效。
+     * 自救优先：先静默 rebind 一次；仍无效则告警（每轮故障只报一次），
+     * 之后每 30 分钟静默重试，恢复后重置。
+     */
+    fun sentinelCheck() {
+        if (!running) return
+        val ctx = appContext ?: return
+        val granted = try {
+            androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+        } catch (_: Exception) { false }
+        if (granted && listenerBound) {
+            // 健康：重置状态（下次故障重新告警）
+            if (sentinelAlerted) {
+                sentinelAlerted = false
+                LogBus.log("sentinel", "通知监听已恢复")
+            }
+            sentinelRetryAt = 0
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (sentinelAlerted && now < sentinelRetryAt) return // 等下一轮 30 分钟重试
+        // 自救：rebind 一次
+        LogBus.log("sentinel", "监听异常(granted=$granted bound=$listenerBound)，尝试自救 rebind")
+        try { com.notifysync.android.service.NotificationListener.rebind(ctx) } catch (_: Exception) {}
+        // 延迟 15 秒复查结果（rebind 是异步的）
+        scheduler.schedule({
+            val reGranted = try {
+                androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+            } catch (_: Exception) { false }
+            if (reGranted && listenerBound) {
+                sentinelRetryAt = 0
+                LogBus.log("sentinel", "自救成功，监听已恢复")
+                return@schedule
+            }
+            if (!sentinelAlerted) {
+                sentinelAlerted = true
+                sentinelRetryAt = System.currentTimeMillis() + 30 * 60 * 1000L
+                LogBus.log("sentinel", "自救失败，告警（30 分钟后静默重试）")
+                main.post { listener.onSentinelAlert(
+                    "通知同步异常",
+                    if (reGranted) "通知监听未绑定，自动修复未成功。通知将无法同步。点击进入 App 修复。"
+                    else "通知使用权已被系统关闭，通知将无法同步。点击进入 App 重新开启。"
+                ) }
+            }
+        }, 15, TimeUnit.SECONDS)
+    }
+
+    @Volatile private var sentinelAlerted = false
+    @Volatile private var sentinelRetryAt = 0L
+    /** 由 SyncService 注入，供哨兵做权限查询与 rebind */
+    @Volatile var appContext: android.content.Context? = null
+    /** 监听器绑定状态（读取 UiState，供哨兵判断） */
+    var listenerBound: Boolean
+        get() = com.notifysync.android.ui.UiState.listenerConnected
+        set(_) {}
 
     private var lastPresenceFailLog = 0L
 

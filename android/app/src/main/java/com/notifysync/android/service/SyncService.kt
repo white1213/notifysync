@@ -37,6 +37,8 @@ class SyncService : Service(), SyncEngine.Listener {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private var sentinelTimer: java.util.Timer? = null
+
     override fun onCreate() {
         super.onCreate()
         app = application as App
@@ -50,11 +52,20 @@ class SyncService : Service(), SyncEngine.Listener {
         } catch (_: Exception) {
         }
         engine = SyncEngine(app.prefs, app.db, this)
+        engine.appContext = applicationContext
         app.engine = engine
         engine.start()
         UiState.serviceRunning = true
         refreshStatusNotification()
         refreshUi()
+        // 哨兵自检：每 10 秒查一次通知监听（§7.1），自救优先、失败只报一次
+        sentinelTimer = java.util.Timer("ns-sentinel").apply {
+            schedule(object : java.util.TimerTask() {
+                override fun run() {
+                    try { engine.sentinelCheck() } catch (_: Exception) {}
+                }
+            }, 10000, 10000)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,6 +83,8 @@ class SyncService : Service(), SyncEngine.Listener {
 
     override fun onDestroy() {
         UiState.serviceRunning = false
+        sentinelTimer?.cancel()
+        sentinelTimer = null
         engine.stop()
         app.engine = null
         try { multicastLock?.release() } catch (_: Exception) {}
@@ -157,6 +170,31 @@ class SyncService : Service(), SyncEngine.Listener {
         } catch (e: Exception) {
             com.notifysync.android.core.LogBus.log("clip", "写入剪贴板失败: ${e.message}")
         }
+    }
+
+    override fun onSentinelAlert(title: String, message: String) {
+        // 可见但不响（§7.1）：高优先级横幅但静音，点击直达修复页
+        try {
+            val open = android.app.PendingIntent.getActivity(
+                this, 1001,
+                android.content.Intent(this, com.notifysync.android.MainActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra("openTab", "settings"),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val builder = androidx.core.app.NotificationCompat.Builder(this, com.notifysync.android.core.NotifPoster.CH_MIRROR)
+                .setSmallIcon(com.notifysync.android.R.drawable.ic_stat_notify)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setSilent(true)
+            val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            nm.notify(2001, builder.build())
+        } catch (_: Exception) {}
+        UiState.toast = "⚠ $message"
+        refreshStatusNotification()
     }
 
     // ---------------- 状态维护 ----------------

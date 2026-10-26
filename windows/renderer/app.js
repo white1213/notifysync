@@ -250,6 +250,10 @@ NS.onPairResult((r) => {
     toast(`配对失败：${why}`);
   }
 });
+NS.onSentinelAlert((info) => {
+  toast(`⚠ ${info.name} 同步异常：能收到广播但连不上（恢复前不再提醒）`, 8000);
+  renderDevicesModal();
+});
 
 // ---- 初始化 ----
 (async function init() {

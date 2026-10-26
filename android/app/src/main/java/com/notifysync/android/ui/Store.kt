@@ -19,6 +19,8 @@ object UiState {
     var toast by mutableStateOf<String?>(null)
     /** 最近一次"发送测试通知"的 nid，用于回执提示 */
     var lastTestNid by mutableStateOf<String?>(null)
+    /** 告警通知点击后直达设置页（哨兵修复页） */
+    var pendingOpenTab by mutableStateOf<Int?>(null)
 
     var settingsMaster by mutableStateOf(true)
     var settingsMirrorPop by mutableStateOf(true)

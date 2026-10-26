@@ -18,7 +18,7 @@
     "appId": "com.notifysync.app",
     "productName": "NotifySync",
     "directories": {
-      "output": "dist"
+      "output": "C:/Users/27730/nsbuild/dist-out"
     },
     "files": [
       "main.js",
@@ -32,7 +32,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },

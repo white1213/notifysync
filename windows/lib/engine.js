@@ -18,6 +18,8 @@ const DIALOG_TIMEOUT_MS = 180000;   // 给足用户走到对方设备确认的�
 const INITIATOR_TIMEOUT_MS = 300000;
 const KEEPALIVE_MS = 20000;
 const UNPAIRED_DENY_MS = 2000;
+// 哨兵：听到某已配对设备的广播、但 60 秒内一次都没连上 → 服务/网络异常（§7.1）
+const SENTINEL_WINDOW_MS = 60000;
 
 let connSeq = 0;
 
@@ -147,6 +149,9 @@ class SyncEngine extends EventEmitter {
     this.dialogTimers = new Map();
     this.initiatorTimers = new Map();
     this.introducedSeen = new Map(); // 无 UDP 发现模块时承接引荐数据
+    // 哨兵状态：peerId -> { heardAt: 最近一次广播时间, firstHeardInEpisode: 本轮异常起始 }
+    this.sentinel = new Map();
+    this.sentinelAlerted = new Set(); // 本轮已告警的 peer（恢复后清除，保证"只报一次"）
   }
 
   start(opts = {}) {
@@ -277,7 +282,48 @@ class SyncEngine extends EventEmitter {
 
   _onPresence(info) {
     this.peerAddr.set(info.id, { address: info.address, port: info.port });
-    if (this.store.getPeer(info.id) && !this.byPeer.has(info.id)) this._tryDialPaired(info.id);
+    if (this.store.getPeer(info.id)) {
+      // 哨兵信号源：听到了已配对设备的广播
+      const s = this.sentinel.get(info.id) || {};
+      s.heardAt = Date.now();
+      if (!s.firstHeardInEpisode) s.firstHeardInEpisode = Date.now();
+      this.sentinel.set(info.id, s);
+      if (!this.byPeer.has(info.id)) this._tryDialPaired(info.id, false);
+    }
+  }
+
+  /**
+   * 哨兵判定（每 10 秒由外部驱动）：已配对设备"持续听到广播但始终连不上"。
+   * 广播消失（设备离开/被彻底杀死）→ 清除本轮状态，不告警；恢复在线 → 重置告警标记（只报一次）。
+   */
+  sentinelTick() {
+    if (!this.running) return;
+    const now = Date.now();
+    for (const [pid, s] of this.sentinel) {
+      const peer = this.store.getPeer(pid);
+      if (!peer) { this.sentinel.delete(pid); this.sentinelAlerted.delete(pid); continue; }
+      const online = !!(this.byPeer.get(pid) && this.byPeer.get(pid).state === 'encrypted');
+      if (online) {
+        // 恢复：清空本轮观察与告警标记，下次故障重新告警
+        this.sentinel.delete(pid);
+        this.sentinelAlerted.delete(pid);
+        continue;
+      }
+      // 广播已消失超过 40s（正常离线：出门/关机/彻底被杀）→ 静默清除，不告警
+      if (!s.heardAt || now - s.heardAt > 40000) {
+        this.sentinel.delete(pid);
+        this.sentinelAlerted.delete(pid);
+        continue;
+      }
+      // 持续听到广播但 60 秒仍未连上 → 异常（只报一次）
+      if (now - s.firstHeardInEpisode >= SENTINEL_WINDOW_MS && !this.sentinelAlerted.has(pid)) {
+        this.sentinelAlerted.add(pid);
+        this.emit('sentinel-alert', {
+          peerId: pid, name: peer.name,
+          address: s.lastAddr || (this.peerAddr.get(pid) || {}).address,
+        });
+      }
+    }
   }
 
   // ---- hello / 配对 ----

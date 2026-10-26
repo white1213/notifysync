@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('notifySync', {
   onPairRequest: (cb) => ipcRenderer.on('pair-request', (_e, info) => cb(info)),
   onPairWaiting: (cb) => ipcRenderer.on('pair-waiting', (_e, info) => cb(info)),
   onPairResult: (cb) => ipcRenderer.on('pair-result', (_e, r) => cb(r)),
+  onSentinelAlert: (cb) => ipcRenderer.on('sentinel-alert', (_e, info) => cb(info)),
 });

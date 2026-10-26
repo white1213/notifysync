@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
         handleClipShareIntent(intent)
         UiState.settingsMaster = app.prefs.masterEnabled
         if (app.prefs.masterEnabled) SyncService.start(this)
+        if (intent?.getStringExtra("openTab") == "settings") UiState.pendingOpenTab = 2
 
         setContent {
             MaterialTheme(colorScheme = androidx.compose.material3.lightColorScheme()) {
@@ -189,6 +190,14 @@ private fun MainScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val app = context.applicationContext as App
     var crashLog by remember { mutableStateOf(app.readCrashLog()) }
+
+    // 哨兵告警点击直达：切到设置（修复）页
+    LaunchedEffect(UiState.pendingOpenTab) {
+        UiState.pendingOpenTab?.let {
+            selected = it
+            UiState.pendingOpenTab = null
+        }
+    }
 
     // 全局提示
     LaunchedEffect(UiState.toast) {

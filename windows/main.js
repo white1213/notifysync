@@ -51,6 +51,8 @@ function bootstrap() {
   setInterval(() => store.prune(), 3600 * 1000);
   // 兜底：界面状态每 10 秒刷新一次，避免任何遗漏的事件导致界面停在旧状态
   setInterval(() => pushState(), 10000);
+  // 哨兵判定：每 10 秒一次（§7.1：听到广播但 60s 连不上 = 服务/网络异常）
+  setInterval(() => engine.sentinelTick(), 10000);
 
   // 剪贴板轮询：电脑→手机全自动实时（手机→电脑受 Android 限制，走 App 前台/分享菜单）
   clipLast = '';
@@ -234,6 +236,20 @@ function wireEngine() {
   });
 
   engine.on('pair-waiting', (info) => { if (win) win.webContents.send('pair-waiting', info); });
+  engine.on('sentinel-alert', (info) => {
+    // 可见但不响（§7.1）：系统通知静音 + 界面提示。恢复后再次发生才会重新报。
+    try {
+      const t = new Notification({
+        title: `${info.name} 同步异常`,
+        body: '能收到它的广播但一直连不上（服务可能被系统限制）。它恢复在线前不会再提醒。',
+        silent: true,
+        timeoutType: 'never',
+      });
+      t.on('click', () => showWindow());
+      t.show();
+    } catch (_) {}
+    if (win) win.webContents.send('sentinel-alert', info);
+  });
   engine.on('pair-request', (info) => {
     showWindow();
     // IPC 只能传纯数据（engine 的 info 带 confirm/reject 函数，直接发会序列化失败导致弹窗永远不出现）
