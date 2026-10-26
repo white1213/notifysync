@@ -51,6 +51,11 @@ import com.notifysync.android.ui.UiState
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** 前台剪贴板轮询间隔（Android 只在窗口有焦点时可读） */
+        private const val CLIP_POLL_MS = 1500L
+    }
+
     private val app by lazy { application as App }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,12 +73,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val clipPoller = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clipPollTask = object : Runnable {
+        override fun run() {
+            if (!isFinishing && !isDestroyed) {
+                maybeSyncLocalClipboard()
+                clipPoller.postDelayed(this, CLIP_POLL_MS)
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         // 刷新历史列表（也可能来自其他线程的更新，这里兜底）
         app.dbExecutor.execute { UiState.items = app.db.queryRecent() }
-        // Android 10+ 后台禁读剪贴板：App 到前台时同步一次本机剪贴板
-        maybeSyncLocalClipboard()
+        // 前台期间持续轮询：Android 10+ 只在有窗口焦点时可读剪贴板，
+        // 单靠 onResume 这一次读取往往拿不到（焦点尚未就位），必须轮询 + 焦点回调双保险
+        clipPoller.postDelayed(clipPollTask, CLIP_POLL_MS)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        clipPoller.removeCallbacks(clipPollTask)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // 窗口拿到焦点后立即读一次（最可靠的时机）
+        if (hasFocus) maybeSyncLocalClipboard()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,11 +117,23 @@ class MainActivity : ComponentActivity() {
         sendClipboardToPeers(text)
     }
 
+    /** 手动同步当前剪贴板（设置页按钮；绕过一切焦点/时序问题） */
+    fun syncClipboardNow() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = try { cm.primaryClip?.getItemAt(0)?.text?.toString() } catch (_: Exception) { null }
+        if (text.isNullOrBlank()) {
+            Toast.makeText(this, "剪贴板为空或系统未授权读取（先点一下 App 窗口再试）", Toast.LENGTH_LONG).show()
+            return
+        }
+        sendClipboardToPeers(text)
+    }
+
     /** App 在前台时读取本机剪贴板并同步（有新内容且不是自己刚写入的） */
     private fun maybeSyncLocalClipboard() {
         if (!app.prefs.clipSync) return
         try {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            // Android 10+：无焦点时可能返回 null，属于正常情况，下次轮询再试
             val text = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: return
             if (text.isBlank() || text.length > 100000) return
             val hash = com.notifysync.android.core.Crypto.clipHash(text)
@@ -109,9 +148,13 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "同步服务未运行", Toast.LENGTH_SHORT).show()
             return
         }
+        if (engine.onlineCount() == 0) {
+            Toast.makeText(this, "没有在线设备，剪贴板未发送", Toast.LENGTH_SHORT).show()
+            return
+        }
         engine.sendClip(text)
         app.prefs.lastClipHash = com.notifysync.android.core.Crypto.clipHash(text)
-        val n = UiState.peers.count { it.online }
+        val n = engine.onlineCount()
         Toast.makeText(this, "剪贴板已同步到 $n 台在线设备", Toast.LENGTH_SHORT).show()
     }
 

@@ -103,6 +103,12 @@ fun SettingsScreen() {
             desc = "收到远端剪贴板时弹 Toast",
             initial = UiState.settingsClipToast,
         ) { app.prefs.clipToast = it; UiState.settingsClipToast = it }
+        Row(Modifier.padding(top = 4.dp)) {
+            OutlinedButton(onClick = {
+                (context as? com.notifysync.android.MainActivity)?.syncClipboardNow()
+                    ?: run { UiState.toast = "请从通知同步 App 内点击此按钮" }
+            }) { Text("立即发送本机剪贴板") }
+        }
 
         Text("本机名称", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
