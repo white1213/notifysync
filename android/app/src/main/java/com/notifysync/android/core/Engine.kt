@@ -157,6 +157,21 @@ class SyncEngine(
 
         fun sendRaw(buf: ByteArray) {
             if (state == ConnState.CLOSED) return
+            // 系统性防护：Android 禁止主线程网络写入。任何调用方误从主线程发送时，
+            // 自动转投后台线程，而不是抛 NetworkOnMainThreadException 导致断连
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                try {
+                    bgExecutor.execute { sendRawNow(buf) }
+                } catch (_: java.util.concurrent.RejectedExecutionException) {
+                    // 引擎正在停止（线程池已关闭），丢弃该帧即可
+                }
+                return
+            }
+            sendRawNow(buf)
+        }
+
+        private fun sendRawNow(buf: ByteArray) {
+            if (state == ConnState.CLOSED) return
             var failed: Exception? = null
             synchronized(sendLock) {
                 try {
@@ -170,7 +185,8 @@ class SyncEngine(
             }
             // 不能在持有 sendLock 时调 close（close 会拿 engine 锁，与发送路径的锁顺序相反）
             failed?.let {
-                LogBus.log("net", "发送失败 ${it.javaClass.simpleName}: ${it.message}")
+                val kind = if (it is android.os.NetworkOnMainThreadException) "MAIN-THREAD!" else it.javaClass.simpleName
+                LogBus.log("net", "发送失败 $kind: ${it.message}")
                 close("send-failed")
             }
         }
@@ -878,6 +894,11 @@ class SyncEngine(
 
     /** 剪贴板同步：广播本机剪贴板文本（调用方负责变化检测与去重） */
     fun sendClip(text: String) {
+        // 调用方（设置页按钮 / 前台轮询）在主线程，网络写入必须离开主线程
+        bgExecutor.execute { sendClipBg(text) }
+    }
+
+    private fun sendClipBg(text: String) {
         val t = text.take(100000)
         if (t.isEmpty()) return
         val hash = Crypto.clipHash(t)
@@ -890,9 +911,16 @@ class SyncEngine(
             .put("originId", prefs.identity.id)
             .put("originName", prefs.identity.name)
             .put("ts", System.currentTimeMillis())
-        for (c in conns.values.toList()) {
-            if (c.state == ConnState.ENCRYPTED) c.sendJsonEnc(msg)
+        var sent = 0
+        synchronized(lock) {
+            for (c in conns.values.toList()) {
+                if (c.state == ConnState.ENCRYPTED) {
+                    c.sendJsonEnc(msg)
+                    sent++
+                }
+            }
         }
+        LogBus.log("clip", "已广播剪贴板 ${t.length} 字 → $sent 台在线设备")
     }
 
     /** 熟人引荐（§6.2 peers）：把对端发来的设备列表合并进本地地址表/发现列表，绕开不可靠的 UDP 发现 */
