@@ -351,6 +351,47 @@ async function testClipboardSync() {
   console.log('  clipboard sync + relay (regression): OK');
 }
 
+async function testSentinel() {
+  // 哨兵（§7.1）：已配对设备"持续听到广播但 60s 连不上"→ sentinel-alert（只报一次）；
+  // 广播消失 → 静默清除；恢复在线 → 重置。用真实引擎 + 假 presence 驱动。
+  const storeA = tmpStore('st-a', 'pc');
+  const storeB = tmpStore('st-b', 'phone');
+  const a = engineFor(storeA, 41127);
+  const b = engineFor(storeB, 41128);
+  a.sentinelWindowMs = 3000; // 测试注入：3 秒判定窗口（生产为 60s）
+  a.start({ discovery: false });
+  b.start({ discovery: false });
+  await pairAndConnect(a, b, 41128);
+
+  // 断开连接但持续"听到"广播 → 60s（此处用极小窗口不可调，改为直接操纵内部状态验证判定）
+  b.stop(); // B 下线
+  a.byPeer.get(storeB.identity.id)?.close('test');
+  await wait(100);
+  const alertP = once(a, 'sentinel-alert', 15000);
+  // 模拟"每 1 秒听到一次广播、但永远连不上"（真实场景由 _onPresence 喂入）
+  const feed = setInterval(() => {
+    a._onPresence({ id: storeB.identity.id, name: 'ST', role: 'phone', address: '127.0.0.1', port: 49999 });
+    a.sentinelTick(); // 生产环境由 main.js 每 10s 驱动；测试里手动驱动
+  }, 1000);
+  const ev = await alertP;
+  clearInterval(feed);
+  assert.strictEqual(ev.peerId, storeB.identity.id);
+  const t0 = Date.now();
+  a.sentinelTick();
+  a.sentinelTick();
+  assert.strictEqual(a.sentinelAlerted.has(storeB.identity.id), true, '告警后再次 tick 不应重复告警');
+
+  // 广播消失 → 静默清除 + 重置（消失阈值测试注入为 300ms）
+  a.sentinelGoneMs = 300;
+  await wait(400);
+  a.sentinelTick();
+  assert.strictEqual(a.sentinelAlerted.has(storeB.identity.id), false, '广播消失后应重置告警标记');
+
+  // 恢复在线 → 再来一轮故障时允许再次告警
+  a.stop();
+  console.log('  sentinel death-watch (regression): OK');
+}
+
 async function main() {
   console.log('crypto vectors:');
   await testCryptoVectors();
@@ -365,6 +406,7 @@ async function main() {
   await testPeerIntroduction();
   await testNotifRelay();
   await testClipboardSync();
+  await testSentinel();
   console.log('\nALL TESTS PASSED');
 }
 

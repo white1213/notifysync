@@ -152,6 +152,8 @@ class SyncEngine extends EventEmitter {
     // 哨兵状态：peerId -> { heardAt: 最近一次广播时间, firstHeardInEpisode: 本轮异常起始 }
     this.sentinel = new Map();
     this.sentinelAlerted = new Set(); // 本轮已告警的 peer（恢复后清除，保证"只报一次"）
+    this.sentinelWindowMs = SENTINEL_WINDOW_MS; // 测试可注入缩短
+    this.sentinelGoneMs = 40000; // 广播消失多久视为"设备离开"（测试可注入缩短）
   }
 
   start(opts = {}) {
@@ -309,14 +311,14 @@ class SyncEngine extends EventEmitter {
         this.sentinelAlerted.delete(pid);
         continue;
       }
-      // 广播已消失超过 40s（正常离线：出门/关机/彻底被杀）→ 静默清除，不告警
-      if (!s.heardAt || now - s.heardAt > 40000) {
+      // 广播已消失超阈值（正常离线：出门/关机/彻底被杀）→ 静默清除，不告警
+      if (!s.heardAt || now - s.heardAt > this.sentinelGoneMs) {
         this.sentinel.delete(pid);
         this.sentinelAlerted.delete(pid);
         continue;
       }
-      // 持续听到广播但 60 秒仍未连上 → 异常（只报一次）
-      if (now - s.firstHeardInEpisode >= SENTINEL_WINDOW_MS && !this.sentinelAlerted.has(pid)) {
+      // 持续听到广播但窗口期内仍未连上 → 异常（只报一次）
+      if (now - s.firstHeardInEpisode >= this.sentinelWindowMs && !this.sentinelAlerted.has(pid)) {
         this.sentinelAlerted.add(pid);
         this.emit('sentinel-alert', {
           peerId: pid, name: peer.name,
