@@ -55,6 +55,7 @@ class SyncService : Service(), SyncEngine.Listener {
         engine.appContext = applicationContext
         app.engine = engine
         engine.start()
+        com.notifysync.android.core.NotifPoster.clearAllMirrors(this)
         UiState.serviceRunning = true
         refreshStatusNotification()
         refreshUi()
